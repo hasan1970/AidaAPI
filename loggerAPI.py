@@ -8,6 +8,7 @@ import requests
 
 
 def delete_old_file(name):
+    #Deleting the specfic file from ElasticSearch using Haystack API
     url = 'http://44.203.174.37:8000/documents/delete_by_filters'
     headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
 
@@ -19,6 +20,7 @@ def delete_old_file(name):
 
 
 def add_new_file(name):
+    #Adding new file to ElasticSearch using Haystack API
     url = 'http://44.203.174.37:8000/file-upload'
     headers = {'accept': 'application/json'}
 
@@ -47,6 +49,7 @@ def json_to_text(dictionary, name):
     
     
 def init_firebase(data):
+    #Initializes Firebase connection and sets the database up
     cred_obj = firebase_admin.credentials.Certificate('./fbaseAccountKey.json')
     default_app = firebase_admin.initialize_app(cred_obj, {'databaseURL':'https://testapi-15563-default-rtdb.firebaseio.com/'})
     ref = db.reference('/')
@@ -62,7 +65,8 @@ class MedicineLog(BaseModel):
     weekly: list
     freq: int
 
-def log_to_firebase(item: MedicineLog):
+def logMedsToFirebase(item: MedicineLog):
+    #Logs the data to firebase
     weekly_schedule = item.weekly
 
     medDetails = {"Name": item.name, "Dosage": item.dosage, "When": item.when, "Frequency": item.freq}
@@ -79,12 +83,17 @@ def log_to_firebase(item: MedicineLog):
         data["medLog"][day].append(medDetails)     
    
 
-def log_to_elastic(name):
+def logMedsToElastic(name):
+    #Logs the data to Elastic Search
+    #Have to delete old medLog file and add new one
     json_to_text(data, name)
     delete_old_file(name)
     add_new_file(name)
 
+def logDataToElastic(name):
+    add_new_file
 
+#struct
 data = {"medLog": 
         {
     "MON":[],
@@ -122,13 +131,24 @@ def get_data():
 
 @app.post("/log-data/{name}")
 def log_data(name):
-    log_to_elastic(name)
+    logDataToElastic(name)
 
 
 @app.post("/log-med")
 def log_med(item: MedicineLog):
-    log_to_firebase(item)
-    log_to_elastic("medLog")
+    logMedsToFirebase(item)
+    name_of_file = "medLog" # have to edit for specific users
+    logMedsToElastic(name_of_file)
+
+
+@app.get("/med-query")
+def medLog_query(query: str):
+    #Query -> Firebase -> back to API
+    #API -> GPT -> API -> Client
+    pass
+     
+
+
 
 
 
