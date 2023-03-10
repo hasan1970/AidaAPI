@@ -41,11 +41,19 @@ def add_new_file(name):
     print(response.json())
 
   
-def json_to_text(dictionary, name):
-    #INCOMPLETE, DON'T KNOW THE FORMATTING TO SEND TO HAYSTACK
-
-    with open('{}.txt'.format(name),'w') as data:
-        data.write(str(dictionary))
+def generate_medication_file(med_dict, patient_name):
+    # patient_name = input("Enter patient name: ")
+    with open(f"{patient_name}_medications.txt", "w") as f:
+        f.write(f"Patient Name: {patient_name}\n")
+        f.write("Medicines for the week:\n\n")
+        for day, meds in med_dict.items():
+            f.write(f"{day.capitalize()}: ")
+            if meds:
+                med_info = [f"{med['Name']} - Dosage:{med['Dosage']} - When:{med['When']} - Frequency:{med['Frequency']}" for med in meds]
+                f.write(", ".join(med_info))
+            else:
+                f.write("None")
+            f.write("\n")
     
     
 def init_firebase(data):
@@ -69,6 +77,8 @@ def logMedsToFirebase(item: MedicineLog):
     #Logs the data to firebase
     weekly_schedule = item.weekly
 
+    medData = ref.get() #Have to code to get for specific user
+
     medDetails = {"Name": item.name, "Dosage": item.dosage, "When": item.when, "Frequency": item.freq}
 
     for day in weekly_schedule:
@@ -80,19 +90,21 @@ def logMedsToFirebase(item: MedicineLog):
         day_details.append(medDetails)
         ref.child("medLog").child(day).set(day_details)
 
-        data["medLog"][day].append(medDetails)     
+        medData["medLog"][day].append(medDetails)
+
+    return medData    
    
 
 
-def logMedsToElastic(name):
+def logMedsToElastic(name, medLogDict):
     #Logs the data to Elastic Search
     #Have to delete old medLog file and add new one
-    json_to_text(data, name)
+    generate_medication_file(medLogDict, name)
     delete_old_file(name)
     add_new_file(name)
 
 def logDataToElastic(name):
-    add_new_file
+    pass
 
 #struct
 data = {"medLog": 
@@ -137,9 +149,9 @@ def log_data(name):
 
 @app.post("/log-med")
 def log_med(item: MedicineLog):
-    logMedsToFirebase(item)
-    name_of_file = "medLog" # have to edit for specific users
-    logMedsToElastic(name_of_file)
+    medData = logMedsToFirebase(item)
+    name_of_file = "medLog" # have to edit for specific users from endpoint?? idk
+    logMedsToElastic(name_of_file, medData)
 
 
 @app.get("/med-query")
