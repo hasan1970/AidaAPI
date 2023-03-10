@@ -83,6 +83,7 @@ def logMedsToFirebase(item: MedicineLog):
         data["medLog"][day].append(medDetails)     
    
 
+
 def logMedsToElastic(name):
     #Logs the data to Elastic Search
     #Have to delete old medLog file and add new one
