@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import json
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
