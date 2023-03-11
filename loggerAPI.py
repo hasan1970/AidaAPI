@@ -9,7 +9,7 @@ from firebase_admin import auth
 import requests
 import os, random, string, time
 
-openai.api_key = os.environ['OPEN_AI_KEY']
+
 
 def delete_old_file(name):
     #Deleting the specfic file from ElasticSearch using Haystack API
@@ -51,7 +51,7 @@ def add_new_file(name):
 
 
 def to_gpt(query,context):
-   
+    openai.api_key = os.environ['OPEN_AI_KEY']
     responsex=openai.ChatCompletion.create(
     model="gpt-3.5-turbo",
     messages=[
