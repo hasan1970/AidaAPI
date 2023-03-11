@@ -41,12 +41,12 @@ def add_new_file(name):
     print(response.json())
 
   
-def generate_medication_file(med_dict, patient_name):
+def generate_medication_file(med_dict, name):
     # patient_name = input("Enter patient name: ")
-    with open(f"{patient_name}_medications.txt", "w") as f:
-        f.write(f"Patient Name: {patient_name}\n")
+    with open(f"{name}.txt", "w") as f:
+        f.write(f"Patient Name: {name}\n")
         f.write("Medicines for the week:\n\n")
-        for day, meds in med_dict.items():
+        for day, meds in med_dict["medLog"].items():
             f.write(f"{day.capitalize()}: ")
             if meds:
                 med_info = [f"{med['Name']} - Dosage:{med['Dosage']} - When:{med['When']} - Frequency:{med['Frequency']}" for med in meds]
@@ -77,7 +77,11 @@ def logMedsToFirebase(item: MedicineLog):
     #Logs the data to firebase
     weekly_schedule = item.weekly
 
-    medData = ref.get() #Have to code to get for specific user
+    medData = ref.get()
+    if not medData:
+        medData = data
+   
+    
 
     medDetails = {"Name": item.name, "Dosage": item.dosage, "When": item.when, "Frequency": item.freq}
 
@@ -89,10 +93,14 @@ def logMedsToFirebase(item: MedicineLog):
         
         day_details.append(medDetails)
         ref.child("medLog").child(day).set(day_details)
-
+        
+        if day not in medData["medLog"].keys():
+            medData["medLog"][day] = []
         medData["medLog"][day].append(medDetails)
+        print(medData)
 
-    return medData    
+
+    return medData
    
 
 
@@ -150,7 +158,8 @@ def log_data(name):
 @app.post("/log-med")
 def log_med(item: MedicineLog):
     medData = logMedsToFirebase(item)
-    name_of_file = "medLog" # have to edit for specific users from endpoint?? idk
+    user_id = "USER1" # have to edit for specific users from endpoint?? idk
+    name_of_file = user_id + "_medLog"
     logMedsToElastic(name_of_file, medData)
 
 
