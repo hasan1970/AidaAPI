@@ -11,7 +11,6 @@ import os, random, string, time
 
 openai.api_key = os.environ['OPEN_AI_KEY']
 
-
 def delete_old_file(name):
     #Deleting the specfic file from ElasticSearch using Haystack API
     url = 'http://44.203.174.37:8000/documents/delete_by_filters'
