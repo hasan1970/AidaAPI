@@ -55,9 +55,9 @@ def to_gpt(query,context):
     responsex=openai.ChatCompletion.create(
     model="gpt-3.5-turbo",
     messages=[
-        {"role": "system", "content": "You are a helpful virtual assistant for senior citizens. \
+        {"role": "system", "content": "You are a helpful virtual assistant named AIDA for senior citizens. \
          You are going answer any query based on the query and context provided to you. \
-          If there is no context and the question is about something that can be stored in the app, tell user to add it using voice note feature\
+          If there is no context and the question is about some information you do not have access to, tell user to add it using voice note feature\
             If there is no context and it is a general question, just answer it normally\
           Context: {}".format(context)},
         {"role": "user", "content": f"{query}"},
@@ -65,6 +65,50 @@ def to_gpt(query,context):
 )
     #have to return content under choice only
     return responsex['choices'][0]['message']['content']
+
+def to_gpt_chatbot(query,context,previous_messages):
+    openai.api_key = os.environ['OPEN_AI_KEY']
+    responsex=openai.ChatCompletion.create(
+    model="gpt-3.5-turbo",
+    messages=[
+        {"role": "system", "content": "You are a helpful chatbot named AIDA. \
+        You are going answer any query based on the query, context and the previous messages provided to you. \
+        If there is no context and the question is about some information you do not have access to, tell user to add it using voice note feature\
+        If there is no context and it is a general question, just answer it normally\
+          Context: {}".format(context)},
+        {"role": "system", "content": f"Answer the query based on the Previous messages on this chat as given: {previous_messages}"},
+        {"role": "user", "content": f"{query}"},
+    ]
+)
+    #have to return content under choice only
+    return responsex['choices'][0]['message']['content']
+
+def extract_messages_chatbot(data):
+    query = ""
+    messages = ""
+    for i, msg in enumerate(data):
+        if i == len(data) - 1:
+            query = msg["message"]
+        else:
+            messages += f"{msg['role']}: {msg['message']}\n"
+    return query, messages
+
+def chatbot_response(x):
+    query, messages = extract_messages_chatbot(x)
+    url = 'http://44.203.174.37:8000/query'
+    headers = {'accept': 'application/json', 'Content-Type': 'application/json'}
+    data = {'query': query, 'params':{},'debug':False}
+    response=requests.post(url, headers=headers, json=data)
+    content=response.json()
+    context=extract_content(content)
+    if len(content['documents'])==0 and messages=="":
+        return to_gpt_chatbot(query,None,None)
+    elif len(content['documents'])==0 and messages!="":
+        return to_gpt_chatbot(query,None,messages)
+    elif len(content['documents'])!=0 and messages=="":
+        return to_gpt_chatbot(query,context,None)
+    else:
+        return to_gpt_chatbot(query,context,messages)
 
 def extract_content(data):
     content_str = ""
@@ -108,7 +152,7 @@ def generate_file(info):
 
     add_new_file(name)
     
-    print(f"File {name}.txt removed successfully!")
+    # print(f"File {name}.txt removed successfully!")
 
 
 def generate_medication_file(med_dict, name, user_id):
@@ -120,7 +164,7 @@ def generate_medication_file(med_dict, name, user_id):
         for day, meds in med_dict[user_id]["medLog"].items():
             f.write(f"{day.capitalize()}: ")
             if meds:
-                med_info = [f"{med['Name']} - Dosage:{med['Dosage']} - When:{med['When']} - Frequency:{med['Frequency']}" for med in meds]
+                med_info = [f"{med['Name']} - Dosage: {med['Dosage']} - When: {med['When']} - Frequency: {med['Frequency']} - Time: {med['Time']}" for med in meds]
                 f.write(", ".join(med_info))
             else:
                 f.write("None")
@@ -131,12 +175,10 @@ def init_firebase():
     #Initializes Firebase connection and sets the database up
     cred_obj = firebase_admin.credentials.Certificate('./fbaseAccountKey.json')
     default_app = firebase_admin.initialize_app(cred_obj, {'databaseURL':'https://testapi-15563-default-rtdb.firebaseio.com/'})
-    ref = db.reference('/')
-    data ={"USERNAME": struct }
-    ref.set(data)
+    ref = db.reference('/Users')
 
     #Creating test user
-    # user = auth.create_user(uid='uid2', email='user2@example.com', phone_number='+12675671818', display_name='Jason Derulo')
+    # user = auth.create_user(uid='uid1', email='userrr@example.com', phone_number='+12612371818', display_name='Alampara Johnson')
     return ref
 
 
@@ -147,12 +189,12 @@ class MedicineLog(BaseModel):
     dosage: str
     weekly: list
     freq: int
+    time: str
 
 def logMedsToFirebase(item: MedicineLog):
     #Logs the data to firebase
     weekly_schedule = item.weekly
     user_id = item.user_id
-
     medData = ref.get()
     #only called once in the first run
     if not medData:
@@ -162,7 +204,7 @@ def logMedsToFirebase(item: MedicineLog):
         medData[user_id] = struct
     # print(medData)
     
-    medDetails = {"Name": item.name, "Dosage": item.dosage, "When": item.when, "Frequency": item.freq}
+    medDetails = {"Name": item.name, "Dosage": item.dosage, "When": item.when, "Frequency": item.freq, "Time":item.time}
 
     for day in weekly_schedule:
         day_details = ref.child(user_id).child("medLog").child(day).get()
@@ -206,11 +248,6 @@ struct = { "medLog" : {
     }
 }
 
-
-
-
-
-
 app = FastAPI()
 
 origins = ["*"]
@@ -232,17 +269,17 @@ def root():
 class StrInput(BaseModel):
     input : str
     
-@app.get("/get-data-by-day/{day}")
-def get_data_by_day(day: str, user_id: StrInput):
-    weekly_plan = ref.child(user_id.input).child("medLog").get()
+@app.get("/get-data-by-data/{user_id}/{day}")
+def get_data_by_day(day: str, user_id: str):
+    weekly_plan = ref.child(user_id).child("medLog").get()
     for key in weekly_plan.keys():
         if key == day:
             return weekly_plan[key]
         
 
-@app.get("/get-data")
-def get_data(user_id : StrInput):
-    weekly_plan = ref.child(user_id.input).child("medLog").get()
+@app.get("/get-data/{user_id}")
+def get_data(user_id : str):
+    weekly_plan = ref.child(user_id).child("medLog").get()
     return weekly_plan
 
 
@@ -261,7 +298,13 @@ def voice_note(info : StrInput):
     generate_file(info)
      
 
+class Chat(BaseModel):
+    chatinput : list
 
+@app.post("/chat")
+def chat(lists : Chat):
+    return chatbot_response(lists.chatinput)
+    # return lists.chatinput
 
 
 
